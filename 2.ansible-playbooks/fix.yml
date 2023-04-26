@@ -1,0 +1,25 @@
+---
+- name: Fix part
+  hosts: s1
+  become: true
+  tasks:
+
+
+    - name: Run oscap for the fix
+      shell: echo '#!/bin/bash' > /tmp/script2.sh
+
+    - name: Generate the yaml file for Remediation
+      shell: echo 'ansible-galaxy collection install ansible.posix' >> /tmp/script2.sh
+
+    - name: Generate the yaml file for Remediation
+      shell: echo 'oscap xccdf generate fix --fix-type ansible --result-id "" arf.xml > playbook.yml --fetch-remote-resources' >> /tmp/script2.sh
+
+    - name: execute the script, script2.sh
+      shell: /tmp/script2.sh
+
+    - name: Copy playbook to controller node
+      fetch:
+        src: /root/playbook.yml
+        dest: /root/
+        flat: yes
+

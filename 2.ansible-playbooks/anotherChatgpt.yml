@@ -1,0 +1,110 @@
+---
+- name: Install openscap-scanner and scap-security-guide
+  hosts: all
+  become: true
+  tasks:
+
+    # Installs
+
+      - name: openscap-scanner
+        yum:
+          name: openscap-scanner
+          state: present
+
+      - name: scap-security-guide
+        yum:
+          name: scap-security-guide
+          state: present
+
+      - name: Create script file
+        file:
+          path: /tmp/script.sh
+          state: touch
+          mode: 0755
+
+      - name: Create an other script file
+        file:
+          path: /tmp/script2.sh
+          state: touch
+          mode: 0755
+
+
+      - name: install ansible
+        command: sudo dnf install ansible -y
+
+    # Run the oscap scanner
+
+      - name: Run oscap command
+        shell: echo '#!/bin/bash' > /tmp/script.sh
+
+      - name: Run oscap command
+        shell: echo 'oscap xccdf eval --profile xccdf_org.ssgproject.content_profile_cis_server_l1 --results-arf arf.xml --report report.html /usr/share/xml/scap/ssg/content/ssg-rhel9-ds.xml' >> /tmp/script.sh
+
+
+      - name: Execute script on targeted hosts
+        shell: /tmp/script.sh
+        ignore_errors: yes
+
+    # Check the reports generated on every host
+
+      - name: visualize the reports
+        yum:
+          name: httpd
+          state: present
+
+      - name: Start httpd service
+        service:
+          name: httpd
+          state: started
+
+      - name: install firewall-cmd
+        command: sudo dnf install firewalld -y
+
+      - name: started ?
+        command: sudo systemctl start firewalld
+
+
+      - name: enabled?
+        command: sudo systemctl enable firewalld
+
+
+
+      - name: Firewall, Opening the http port to see the reports
+        command: "firewall-cmd --add-service=http --permanent"
+
+      - name: Firewall reload changes
+        command: firewall-cmd --reload
+
+      - name: copy the repport to the /var/www/html
+        command: cp report.html /var/www/html/index.html
+
+
+    # Remediation part
+
+      - name: Run oscap for the fix
+        shell: |
+          echo '#!/bin/bash' > /tmp/script2.sh
+          echo 'ansible-galaxy collection install ansible.posix' >> /tmp/script2.sh
+          echo 'oscap xccdf generate fix --fix-type ansible --result-id "" arf.xml > /tmp/remediation.yml --fetch-remote-resources' >> /tmp/script2.sh
+        args:
+          executable: /bin/bash
+        become: true
+
+      - name: Transfer remediation playbook to controller node
+        fetch:
+          src: /tmp/remediation.yml
+          dest: /root/remediation.yml
+          flat: yes
+        become: true
+
+      - name: Apply remediation playbook
+        hosts: all
+        become: true
+        tasks:
+          - name: Include remediation playbook
+            include_playbook: /root/remediation.yml
+
+
+    
+     # Compaire resultss
+ 

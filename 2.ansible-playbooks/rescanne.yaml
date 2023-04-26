@@ -1,0 +1,51 @@
+---
+- name: Install openscap-scanner and scap-security-guide
+  hosts: all
+  become: true
+  tasks:    
+    
+    # Run the oscap scanner
+
+      - name: Run oscap command
+        shell: echo '#!/bin/bash' > /tmp/script.sh
+
+      - name: Run oscap command
+        shell: echo 'oscap xccdf eval --profile xccdf_org.ssgproject.content_profile_cis_server_l1 --results-arf arf.xml --report report.html /usr/share/xml/scap/ssg/content/ssg-rhel9-ds.xml' >> /tmp/script.sh
+
+
+      - name: Execute script on targeted hosts
+        shell: /tmp/script.sh
+        ignore_errors: yes
+
+    # Check the reports generated on every host
+
+      - name: visualize the reports
+        yum:
+          name: httpd
+          state: present
+
+      - name: Start httpd service
+        service:
+          name: httpd
+          state: started
+
+      - name: install firewall-cmd
+        command: sudo dnf install firewalld -y
+
+      - name: started ?
+        command: sudo systemctl start firewalld
+
+
+      - name: enabled?
+        command: sudo systemctl enable firewalld
+
+
+
+      - name: Firewall, Opening the http port to see the reports
+        command: "firewall-cmd --add-service=http --permanent"
+
+      - name: Firewall reload changes
+        command: firewall-cmd --reload
+
+      - name: copy the repport to the /var/www/html
+        command: cp report.html /var/www/html/index.html
